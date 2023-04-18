@@ -115,7 +115,7 @@ int main(int argc, char** argv)
     }
     std::fill(data.begin(), data.end(), i);
     LOG_INFO("Invoking send_message(" << +data[0] << ")");
-    send_message_rpc.on(server)(data);
+    PostSend(send_message_rpc, server, std::move(data));
   }
 
   tl::remote_procedure exit_server_rpc = myEngine.define("exit_server");
