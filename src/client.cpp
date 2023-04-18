@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <mutex>
+#include <random>
 #include <thallium.hpp>
 #include <thallium/pool.hpp>
 #include <thallium/scheduler.hpp>
@@ -104,17 +105,25 @@ int main(int argc, char** argv)
   tl::remote_procedure send_message_rpc = myEngine.define("send_message");
   tl::endpoint server = myEngine.lookup(url->c_str());
 
-  for (int i = 1; i < 6; ++i)
+  // there are 6 bags. each bag can give a random bytesize within the commented ranges.
+  // a bag is selected at random for each message.
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::uniform_int_distribution<std::size_t> bag_id_rnd(0, 5);
+  std::vector<std::uniform_int_distribution<std::size_t>> msg_size_rnds;
+  msg_size_rnds.emplace_back(1, 1024);                               // 1B ... 1KB
+  msg_size_rnds.emplace_back(1024, 10 * 1024);                       // 1KB ... 10KB
+  msg_size_rnds.emplace_back(10 * 1024, 1024 * 1024);                // 10KB ... 1MB
+  msg_size_rnds.emplace_back(1024 * 1024, 10 * 1024 * 1024);         // 1MB ... 10MB
+  msg_size_rnds.emplace_back(10 * 1024 * 1024, 100 * 1024 * 1024);   // 10MB ... 100MB
+  msg_size_rnds.emplace_back(100 * 1024 * 1024, 1024 * 1024 * 1024); // 100MB ... 1GB
+
+  for (int i = 1; i < std::numeric_limits<uint8_t>::max(); ++i)
   {
     std::vector<uint8_t> data;
-    if (i % 2)
-    {
-      data.resize(10);
-    }
-    else
-    {
-      data.resize(10000);
-    }
+    const std::size_t bag_id = bag_id_rnd(rng);
+    const std::size_t size = msg_size_rnds[bag_id](rng);
+    data.resize(size);
     std::fill(data.begin(), data.end(), i);
     LOG_INFO("Post send_message(" << +data[0] << ")");
     PostSend(send_message_rpc, server, std::move(data));
