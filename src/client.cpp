@@ -36,8 +36,8 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
         while (!idle)
         {
           auto& data = OutboundQueue.front();
-          uint8_t h = rpc.on(server)(data);
-          LOG_DEBUG("Got " << int(h) << std::endl);
+          rpc.on(server)(data);
+          LOG_DEBUG("Server received message" << std::endl);
           {
             std::lock_guard<std::mutex> lock(Mutex);
             OutboundQueue.pop_front();
