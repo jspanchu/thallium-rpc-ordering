@@ -21,6 +21,26 @@ tl::engine myEngine;
 std::mutex Mutex;
 std::vector<tl::managed<tl::thread>> threads;
 
+inline std::string get_nice_bytes(int num_bytes)
+{
+  if (num_bytes > 1024 * 1024 * 1024)
+  {
+    return std::to_string(int(num_bytes / (1024 * 1024 * 1024))) + "GB";
+  }
+  else if (num_bytes > 1024 * 1024)
+  {
+    return std::to_string(int(num_bytes / (1024 * 1024))) + "MB";
+  }
+  else if (num_bytes > 1024)
+  {
+    return std::to_string(int(num_bytes / 1024)) + "KB";
+  }
+  else
+  {
+    return std::to_string(num_bytes) + "By";
+  }
+}
+
 void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
 {
   bool idle = false;
@@ -125,7 +145,7 @@ int main(int argc, char** argv)
     const std::size_t size = msg_size_rnds[bag_id](rng);
     data.resize(size);
     std::fill(data.begin(), data.end(), i);
-    LOG_INFO("Post send_message(" << +data[0] << ")");
+    LOG_INFO("Post send_message(" << +data[0] << ") [" << get_nice_bytes(size) << "]");
     PostSend(send_message_rpc, server, std::move(data));
   }
 
