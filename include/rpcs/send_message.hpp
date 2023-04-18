@@ -16,7 +16,8 @@ static void send_message(const tl::request& req, const std::vector<uint8_t>& dat
   {
     std::stringstream msg;
     msg << "Unexpected head! [" << +head << '-' << +last_head << " != " << 1 << ']';
-    throw std::runtime_error(msg.str());
+    // throw std::runtime_error(msg.str());
+    LOG_CRITICAL(msg.str());
   }
   last_head = head;
 }
