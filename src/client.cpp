@@ -125,5 +125,7 @@ int main(int argc, char** argv)
   }
 
   tl::remote_procedure exit_server_rpc = myEngine.define("exit_server");
-  return exit_server_rpc.on(server)();
+  int exitCode = exit_server_rpc.on(server)();
+  myEngine.finalize();
+  return exitCode;
 }
