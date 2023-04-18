@@ -1,6 +1,7 @@
 #include <limits>
 
 #include <deque>
+#include <future>
 #include <mutex>
 #include <random>
 #include <thallium.hpp>
@@ -16,10 +17,15 @@ namespace tl = thallium;
 
 using Message = std::vector<uint8_t>;
 
-std::deque<Message> OutboundQueue;
+struct RPCCall
+{
+  Message data;
+  tl::remote_procedure rpc;
+};
+
+std::deque<RPCCall> OutboundQueue;
 tl::engine myEngine;
 std::mutex Mutex;
-std::vector<tl::managed<tl::thread>> threads;
 
 inline std::string get_nice_bytes(int num_bytes)
 {
@@ -41,26 +47,34 @@ inline std::string get_nice_bytes(int num_bytes)
   }
 }
 
+std::promise<int> P;
+
 void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
 {
   bool idle = false;
   {
     std::lock_guard<std::mutex> lock(Mutex);
     idle = OutboundQueue.empty();
-    OutboundQueue.emplace_back(data);
+    OutboundQueue.emplace_back(RPCCall{ std::move(data), rpc });
   }
   LOG_DEBUG("is_idle=" << idle);
   if (idle)
   {
-    threads.emplace_back(myEngine.get_handler_pool().make_thread(
-      [rpc, server]()
-      {
+    myEngine.get_handler_pool().make_thread(
+      [server]() {
         bool idle = false;
         while (!idle)
         {
-          auto& data = OutboundQueue.front();
-          LOG_DEBUG("Make rpc call " << int(data[0]));
-          rpc.on(server)(data);
+          auto& rpccall = OutboundQueue.front();
+          if (!rpccall.data.empty())
+          {
+            LOG_DEBUG("Make rpc call " << int(rpccall.data[0]));
+            rpccall.rpc.on(server)(rpccall.data);
+          }
+          else
+          {
+            P.set_value(int(rpccall.rpc.on(server)()));
+          }
           LOG_DEBUG("Server received message");
           {
             std::lock_guard<std::mutex> lock(Mutex);
@@ -69,7 +83,8 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
           }
         }
         LOG_DEBUG("Queue empty!");
-      }));
+      },
+      thallium::anonymous{});
   }
 }
 
@@ -149,13 +164,11 @@ int main(int argc, char** argv)
     PostSend(send_message_rpc, server, std::move(data));
   }
 
-  for (auto& thread : threads)
-  {
-    thread->join();
-  }
-
   tl::remote_procedure exit_server_rpc = myEngine.define("exit_server");
-  int exitCode = exit_server_rpc.on(server)();
+
+  PostSend(exit_server_rpc, server, {});
+  auto f = P.get_future();
+  int exitCode = f.get();
   myEngine.finalize();
   return exitCode;
 }
