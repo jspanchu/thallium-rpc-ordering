@@ -12,6 +12,7 @@ namespace tl = thallium;
 static uint8_t lastHead = 0;
 
 void hello(const tl::request &req, const std::vector<uint8_t> &data) {
+  req.respond(lastHead);
   const uint8_t &head = data.front();
   std::cout << "Data[0] " << +head << std::endl;
 
@@ -39,7 +40,7 @@ int main(int argc, char *argv[]) {
   tl::engine myEngine("tcp", THALLIUM_SERVER_MODE, *progress_pool, *rpc_pool);
   myEngine.set_logger(&logger);
   myEngine.set_log_level(tl::logger::level::info);
-  myEngine.define("hello", &hello).disable_response();
+  myEngine.define("hello", &hello);// .disable_response();
   std::cout << "Server running at address " << myEngine.self() << std::endl;
 
   return 0;

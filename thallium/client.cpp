@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   tl::engine myEngine("tcp", THALLIUM_CLIENT_MODE, *progress_pool, *rpc_pool);
   myEngine.set_logger(&logger);
   myEngine.set_log_level(tl::logger::level::info);
-  tl::remote_procedure hello = myEngine.define("hello").disable_response();
+  tl::remote_procedure hello = myEngine.define("hello"); //.disable_response();
   tl::endpoint server = myEngine.lookup(argv[1]);
 
   // for (int i = 1; i < std::numeric_limits<uint8_t>::max(); ++i) {
