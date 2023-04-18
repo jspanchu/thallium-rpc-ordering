@@ -18,6 +18,7 @@ using Message = std::vector<uint8_t>;
 std::deque<Message> OutboundQueue;
 tl::engine myEngine;
 std::mutex Mutex;
+std::vector<tl::managed<tl::thread>> threads;
 
 void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
 {
@@ -30,7 +31,7 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
   LOG_DEBUG("is_idle=" << idle);
   if (idle)
   {
-    myEngine.get_handler_pool().make_thread(
+    threads.emplace_back(myEngine.get_handler_pool().make_thread(
       [rpc, server]()
       {
         bool idle = false;
@@ -47,8 +48,7 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
           }
         }
         LOG_DEBUG("Queue empty!");
-      },
-      thallium::anonymous{});
+      }));
   }
 }
 
@@ -118,6 +118,10 @@ int main(int argc, char** argv)
     std::fill(data.begin(), data.end(), i);
     LOG_INFO("Post send_message(" << +data[0] << ")");
     PostSend(send_message_rpc, server, std::move(data));
+  }
+
+  for (auto& thread: threads) {
+    thread->join();
   }
 
   tl::remote_procedure exit_server_rpc = myEngine.define("exit_server");
