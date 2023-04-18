@@ -120,7 +120,8 @@ int main(int argc, char** argv)
     PostSend(send_message_rpc, server, std::move(data));
   }
 
-  for (auto& thread: threads) {
+  for (auto& thread : threads)
+  {
     thread->join();
   }
 
