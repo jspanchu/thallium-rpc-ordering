@@ -95,7 +95,7 @@ int main(int argc, char** argv)
 
   // engine setup.
   auto protocol = url->substr(0, url->find_first_of(':'));
-  tl::engine myEngine(protocol, THALLIUM_CLIENT_MODE, *progress_pool, *rpc_pool);
+  myEngine = tl::engine(protocol, THALLIUM_CLIENT_MODE, *progress_pool, *rpc_pool);
   myEngine.set_logger(&logger_instance);
   myEngine.set_log_level(log_level);
 
