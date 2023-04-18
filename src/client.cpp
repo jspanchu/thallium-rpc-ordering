@@ -27,6 +27,7 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
     idle = OutboundQueue.empty();
     OutboundQueue.emplace_back(data);
   }
+  LOG_DEBUG("is_idle=" << idle);
   if (idle)
   {
     myEngine.get_handler_pool().make_thread(
@@ -36,15 +37,16 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
         while (!idle)
         {
           auto& data = OutboundQueue.front();
+          LOG_DEBUG("Make rpc call " << int(data[0]));
           rpc.on(server)(data);
-          LOG_DEBUG("Server received message" << std::endl);
+          LOG_DEBUG("Server received message");
           {
             std::lock_guard<std::mutex> lock(Mutex);
             OutboundQueue.pop_front();
             idle = OutboundQueue.empty();
           }
         }
-        LOG_DEBUG("Queue empty !" << std::endl);
+        LOG_DEBUG("Queue empty!");
       },
       thallium::anonymous{});
   }
@@ -114,7 +116,7 @@ int main(int argc, char** argv)
       data.resize(10000);
     }
     std::fill(data.begin(), data.end(), i);
-    LOG_INFO("Invoking send_message(" << +data[0] << ")");
+    LOG_INFO("Post send_message(" << +data[0] << ")");
     PostSend(send_message_rpc, server, std::move(data));
   }
 
