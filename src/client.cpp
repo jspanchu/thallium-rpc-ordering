@@ -51,6 +51,42 @@ std::promise<int> P;
 
 void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
 {
+#ifdef LOCKFREE_RPC_POST
+  myEngine.get_handler_pool().make_task(
+    [rpc, server, data]()
+    {
+      bool idle = OutboundQueue.empty();
+      OutboundQueue.emplace_back(RPCCall{ std::move(data), rpc });
+      LOG_DEBUG("is_idle=" << idle);
+      if (idle)
+      {
+        myEngine.get_handler_pool().make_thread(
+          [server]()
+          {
+            bool idle = false;
+            while (!idle)
+            {
+              auto& rpccall = OutboundQueue.front();
+              if (!rpccall.data.empty())
+              {
+                LOG_DEBUG("Make rpc call " << int(rpccall.data[0]));
+                rpccall.rpc.on(server)(rpccall.data);
+              }
+              else
+              {
+                P.set_value(int(rpccall.rpc.on(server)()));
+              }
+              LOG_DEBUG("Server received message");
+              OutboundQueue.pop_front();
+              idle = OutboundQueue.empty();
+            }
+            LOG_DEBUG("Queue empty!");
+          },
+          thallium::anonymous{});
+      }
+    },
+    thallium::anonymous{});
+#else
   bool idle = false;
   {
     std::lock_guard<std::mutex> lock(Mutex);
@@ -61,7 +97,8 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
   if (idle)
   {
     myEngine.get_handler_pool().make_thread(
-      [server]() {
+      [server]()
+      {
         bool idle = false;
         while (!idle)
         {
@@ -86,6 +123,7 @@ void PostSend(tl::remote_procedure rpc, tl::endpoint server, Message&& data)
       },
       thallium::anonymous{});
   }
+#endif
 }
 
 int main(int argc, char** argv)
